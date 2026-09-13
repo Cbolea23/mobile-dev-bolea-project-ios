@@ -7,6 +7,8 @@
 
 import SwiftUI
 
+import SwiftUI
+
 struct HomeView: View {
     @EnvironmentObject var recipeVM: RecipeViewModel
     @State private var search = ""
@@ -40,12 +42,26 @@ struct HomeView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     
-                    // Search Bar
+                    // Live Search Bar
                     HStack(spacing: 10) {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.secondary)
                         TextField("Search meals, ingredients...", text: $search)
                             .font(.system(size: 14))
+                            .onSubmit {
+                                Task {
+                                    await recipeVM.searchMeals(query: search)
+                                }
+                            }
+                        if !search.isEmpty {
+                            Button(action: {
+                                search = ""
+                                Task { await recipeVM.fetchMeals(for: recipeVM.selectedCategory) }
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
@@ -57,7 +73,7 @@ struct HomeView: View {
                     )
                     .padding(.horizontal, 20)
                     
-                    // Category Filter Pills
+                    // Live Category Filter Pills
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
                             ForEach(categories, id: \.self) { cat in
@@ -73,14 +89,16 @@ struct HomeView: View {
                                             .stroke(recipeVM.selectedCategory == cat ? Color.clear : Color.ulamBorder, lineWidth: 1)
                                     )
                                     .onTapGesture {
-                                        recipeVM.selectedCategory = cat
+                                        Task {
+                                            await recipeVM.fetchMeals(for: cat)
+                                        }
                                     }
                             }
                         }
                         .padding(.horizontal, 20)
                     }
                     
-                    // Ulam ng Araw (Featured Banner)
+                    // Ulam ng Araw (Featured Live Card)
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Ulam ng Araw")
@@ -110,9 +128,8 @@ struct HomeView: View {
                                 )
                                 .cornerRadius(20)
                                 
-                                // Banner Tags & Details
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text("Pork")
+                                    Text(recipeVM.featuredMeal.category)
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 10)
@@ -123,6 +140,7 @@ struct HomeView: View {
                                     Text(recipeVM.featuredMeal.title)
                                         .font(.system(size: 20, weight: .bold))
                                         .foregroundColor(.white)
+                                        .lineLimit(1)
                                     
                                     HStack(spacing: 14) {
                                         Label(recipeVM.featuredMeal.time, systemImage: "clock")
@@ -135,11 +153,10 @@ struct HomeView: View {
                                 }
                                 .padding(16)
                                 
-                                // Medium Tag (Top-Right)
                                 VStack {
                                     HStack {
                                         Spacer()
-                                        Text("MEDIUM")
+                                        Text(recipeVM.featuredMeal.difficulty.uppercased())
                                             .font(.system(size: 10, weight: .heavy))
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 5)
@@ -155,7 +172,7 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, 20)
                     
-                    // Sikat na Lutuin Grid
+                    // Sikat na Lutuin Live Grid
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Text("Sikat na Lutuin")
@@ -167,12 +184,22 @@ struct HomeView: View {
                                 .foregroundColor(.ulamOrange)
                         }
                         
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
-                            ForEach(recipeVM.popularMeals) { meal in
-                                NavigationLink(destination: RecipeDetailView(recipe: meal)) {
-                                    PopularDishCard(meal: meal)
+                        if recipeVM.isLoading {
+                            HStack {
+                                Spacer()
+                                ProgressView("Kumukuha ng mga lutuin...")
+                                    .tint(Color.ulamOrange)
+                                    .padding(.vertical, 30)
+                                Spacer()
+                            }
+                        } else {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
+                                ForEach(recipeVM.popularMeals) { meal in
+                                    NavigationLink(destination: RecipeDetailView(recipe: meal)) {
+                                        PopularDishCard(meal: meal)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
-                                .buttonStyle(PlainButtonStyle())
                             }
                         }
                     }

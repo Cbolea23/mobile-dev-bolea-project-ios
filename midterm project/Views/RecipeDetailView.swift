@@ -10,9 +10,10 @@ import SwiftUI
 struct RecipeDetailView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var recipeVM: RecipeViewModel
-    let recipe: RecipeItem
     
+    @State var recipe: RecipeItem
     @State private var selectedTab: Int = 0
+    @State private var isLoadingDetails: Bool = false
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -74,7 +75,7 @@ struct RecipeDetailView: View {
                     // Recipe Title & Quick Badges
                     VStack(alignment: .leading, spacing: 10) {
                         Text(recipe.title)
-                            .font(.system(size: 28, weight: .black, design: .rounded))
+                            .font(.system(size: 26, weight: .black, design: .rounded))
                             .foregroundColor(Color.ulamTextDark)
                         
                         Text(recipe.nativeName)
@@ -146,8 +147,16 @@ struct RecipeDetailView: View {
                     .cornerRadius(12)
                     .padding(.horizontal, 20)
                     
-                    // Tab Content
-                    if selectedTab == 0 {
+                    // Tab Content (Live Data from API)
+                    if isLoadingDetails {
+                        HStack {
+                            Spacer()
+                            ProgressView("Kinakarga ang detalye...")
+                                .tint(Color.ulamOrange)
+                                .padding(.vertical, 30)
+                            Spacer()
+                        }
+                    } else if selectedTab == 0 {
                         // Ingredients Checklist
                         VStack(spacing: 8) {
                             ForEach(recipe.ingredients, id: \.self) { item in
@@ -210,8 +219,18 @@ struct RecipeDetailView: View {
                     }
                 }
             }
+            .task {
+                // Fetch full ingredients & instructions if not yet loaded
+                if recipe.ingredients.isEmpty {
+                    self.isLoadingDetails = true
+                    if let full = await recipeVM.fetchRecipeDetails(id: recipe.id) {
+                        self.recipe = full
+                    }
+                    self.isLoadingDetails = false
+                }
+            }
             
-            // Fixed Bottom Floating Action Button
+            // Bottom Action Button
             Button(action: {}) {
                 Text("Magsimula ng Pagluluto")
                     .font(.system(size: 16, weight: .bold))
