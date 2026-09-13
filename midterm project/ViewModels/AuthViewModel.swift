@@ -10,8 +10,8 @@ import Combine
 
 class AuthViewModel: ObservableObject {
     @Published var isAuthenticated: Bool = false
-    @Published var currentUserEmail: String = "alex@example.com"
-    @Published var currentUserName: String = "Alex"
+    @Published var currentUserEmail: String = "christianbolea@gmail.com"
+    @Published var currentUserName: String = "Christian"
     
     func login(email: String, password: String) {
         // Validate credentials for demo authentication
