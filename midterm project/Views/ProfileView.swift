@@ -20,17 +20,17 @@ struct ProfileView: View {
                         .fill(Color.ulamOrange)
                         .frame(width: 84, height: 84)
                         .overlay(
-                            Text("A")
+                            Text("C")
                                 .font(.system(size: 36, weight: .bold))
                                 .foregroundColor(.white)
                         )
                         .shadow(color: Color.ulamOrange.opacity(0.35), radius: 10, y: 5)
                     
-                    Text("Alex")
+                    Text("Christian")
                         .font(.system(size: 22, weight: .bold))
                         .foregroundColor(Color.ulamTextDark)
                     
-                    Text("alex@example.com")
+                    Text("christianbolea@gmail.com")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)
                 }

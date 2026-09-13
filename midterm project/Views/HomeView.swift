@@ -25,7 +25,7 @@ struct HomeView: View {
                             Text("Magandang umaga")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary)
-                            Text("Tara, luto tayo, Alex!")
+                            Text("Tara, luto tayo, Christian!")
                                 .font(.system(size: 22, weight: .bold, design: .rounded))
                                 .foregroundColor(Color.ulamTextDark)
                         }
@@ -34,7 +34,7 @@ struct HomeView: View {
                             .fill(Color.ulamOrange)
                             .frame(width: 44, height: 44)
                             .overlay(
-                                Text("A")
+                                Text("C")
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundColor(.white)
                             )

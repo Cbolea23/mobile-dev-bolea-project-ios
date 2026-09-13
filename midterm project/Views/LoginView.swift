@@ -9,7 +9,7 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var authVM: AuthViewModel
-    @State private var email: String = "alex@example.com"
+    @State private var email: String = "christianbolea@gmail.com"
     @State private var password: String = "••••••••"
     
     var body: some View {
@@ -50,7 +50,7 @@ struct LoginView: View {
                         Image(systemName: "sparkle.magnifyingglass")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(.ulamOrange)
-                        Text("Discover authentic Filipino recipes")
+                        Text("Discover Foods that you never tried before!")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.ulamOrange)
                     }
