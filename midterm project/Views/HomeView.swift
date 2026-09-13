@@ -8,65 +8,239 @@
 import SwiftUI
 
 struct HomeView: View {
-    @StateObject private var recipeVM = RecipeViewModel()
-    @EnvironmentObject var authVM: AuthViewModel
+    @EnvironmentObject var recipeVM: RecipeViewModel
+    @State private var search = ""
+    let categories = ["All", "Beef", "Chicken", "Pork", "Seafood"]
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 15) {
-                    Text("Welcome back, \(authVM.user.username)!")
-                        .font(.headline)
-                        .padding(.horizontal)
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 20) {
                     
-                    if recipeVM.isLoading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: 200)
-                    } else {
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 15) {
-                            ForEach(recipeVM.categories) { category in
-                                NavigationLink(destination: RecipeListView(categoryName: category.strCategory)) {
-                                    VStack {
-                                        AsyncImage(url: URL(string: category.strCategoryThumb)) { image in
-                                            image.resizable().scaledToFit()
-                                        } placeholder: {
-                                            ProgressView()
-                                        }
-                                        .frame(height: 100)
-                                        .cornerRadius(8)
-                                        
-                                        Text(category.strCategory)
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.primary)
+                    // Top Header Bar
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Magandang umaga")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Text("Tara, luto tayo, Alex!")
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .foregroundColor(Color.ulamTextDark)
+                        }
+                        Spacer()
+                        Circle()
+                            .fill(Color.ulamOrange)
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Text("A")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
+                            )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    
+                    // Search Bar
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.secondary)
+                        TextField("Search meals, ingredients...", text: $search)
+                            .font(.system(size: 14))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color.ulamCard)
+                    .cornerRadius(14)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.ulamBorder, lineWidth: 1)
+                    )
+                    .padding(.horizontal, 20)
+                    
+                    // Category Filter Pills
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(categories, id: \.self) { cat in
+                                Text(cat)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .padding(.horizontal, 18)
+                                    .padding(.vertical, 8)
+                                    .background(recipeVM.selectedCategory == cat ? Color.ulamOrange : Color.ulamCard)
+                                    .foregroundColor(recipeVM.selectedCategory == cat ? .white : Color.ulamTextDark)
+                                    .cornerRadius(20)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 20)
+                                            .stroke(recipeVM.selectedCategory == cat ? Color.clear : Color.ulamBorder, lineWidth: 1)
+                                    )
+                                    .onTapGesture {
+                                        recipeVM.selectedCategory = cat
                                     }
-                                    .padding()
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(12)
-                                }
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 20)
                     }
+                    
+                    // Ulam ng Araw (Featured Banner)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Ulam ng Araw")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundColor(Color.ulamTextDark)
+                            Spacer()
+                            Text("Tingnan lahat")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.ulamOrange)
+                        }
+                        
+                        NavigationLink(destination: RecipeDetailView(recipe: recipeVM.featuredMeal)) {
+                            ZStack(alignment: .bottomLeading) {
+                                AsyncImage(url: URL(string: recipeVM.featuredMeal.imageUrl)) { img in
+                                    img.resizable().aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    Color.gray.opacity(0.2)
+                                }
+                                .frame(height: 200)
+                                .clipped()
+                                .overlay(
+                                    LinearGradient(
+                                        colors: [.clear, .black.opacity(0.85)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .cornerRadius(20)
+                                
+                                // Banner Tags & Details
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Pork")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                        .background(Color.white.opacity(0.25))
+                                        .cornerRadius(8)
+                                    
+                                    Text(recipeVM.featuredMeal.title)
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(.white)
+                                    
+                                    HStack(spacing: 14) {
+                                        Label(recipeVM.featuredMeal.time, systemImage: "clock")
+                                        Label(recipeVM.featuredMeal.calories, systemImage: "flame")
+                                        Label(recipeVM.featuredMeal.rating, systemImage: "star.fill")
+                                            .foregroundColor(.yellow)
+                                    }
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.9))
+                                }
+                                .padding(16)
+                                
+                                // Medium Tag (Top-Right)
+                                VStack {
+                                    HStack {
+                                        Spacer()
+                                        Text("MEDIUM")
+                                            .font(.system(size: 10, weight: .heavy))
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                            .background(Color.ulamOrange)
+                                            .foregroundColor(.white)
+                                            .cornerRadius(8)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(14)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Sikat na Lutuin Grid
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Text("Sikat na Lutuin")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundColor(Color.ulamTextDark)
+                            Spacer()
+                            Text("Lahat")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.ulamOrange)
+                        }
+                        
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
+                            ForEach(recipeVM.popularMeals) { meal in
+                                NavigationLink(destination: RecipeDetailView(recipe: meal)) {
+                                    PopularDishCard(meal: meal)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 24)
                 }
             }
-            .navigationTitle("Recipe Categories")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: ProfileView()) {
-                        Image(systemName: "person.circle.fill")
-                            .font(.title2)
-                    }
-                }
-            }
-            .onAppear {
-                recipeVM.fetchCategories()
-            }
+            .background(Color.ulamCream.ignoresSafeArea())
+            .navigationBarHidden(true)
         }
     }
 }
 
-#Preview {
-    HomeView()
-        .environmentObject(AuthViewModel())
+struct PopularDishCard: View {
+    @EnvironmentObject var recipeVM: RecipeViewModel
+    let meal: RecipeItem
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .topTrailing) {
+                AsyncImage(url: URL(string: meal.imageUrl)) { img in
+                    img.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    Color.gray.opacity(0.2)
+                }
+                .frame(height: 120)
+                .clipped()
+                .cornerRadius(14)
+                
+                Button(action: {
+                    recipeVM.toggleSave(meal: meal)
+                }) {
+                    Image(systemName: recipeVM.isSaved(meal: meal) ? "heart.fill" : "heart")
+                        .font(.system(size: 12, weight: .bold))
+                        .padding(7)
+                        .background(Color.black.opacity(0.45))
+                        .foregroundColor(recipeVM.isSaved(meal: meal) ? Color.ulamOrange : .white)
+                        .clipShape(Circle())
+                }
+                .padding(8)
+            }
+            
+            Text(meal.title)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(Color.ulamTextDark)
+                .lineLimit(1)
+            
+            HStack {
+                Text(meal.time)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                Spacer()
+                HStack(spacing: 2) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.ulamOrange)
+                    Text(meal.rating)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color.ulamTextDark)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.ulamCard)
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.ulamBorder, lineWidth: 1)
+        )
+    }
 }

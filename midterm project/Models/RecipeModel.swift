@@ -32,8 +32,29 @@ struct Meal: Codable, Identifiable {
     var id: String { idMeal }
 }
 
+struct RecipeItem: Identifiable, Codable, Equatable {
+    let id: String
+    let title: String
+    let nativeName: String
+    let origin: String
+    let time: String
+    let servings: String
+    let calories: String
+    let rating: String
+    let category: String
+    let difficulty: String
+    let imageUrl: String
+    let ingredients: [String]
+    let instructions: [String]
+}
+
 struct UserProfile: Codable {
     var username: String
     var email: String
-    var favoriteCuisine: String
+    var recipesCount: Int
+    var savedCount: Int
+    var cookedCount: Int
+    var dietaryPreference: String
+    var skillLevel: String
+    var notificationsEnabled: Bool
 }

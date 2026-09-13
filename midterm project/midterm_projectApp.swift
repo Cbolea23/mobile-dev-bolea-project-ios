@@ -10,17 +10,13 @@ import SwiftUI
 @main
 struct midterm_projectApp: App {
     @StateObject private var authVM = AuthViewModel()
+    @StateObject private var recipeVM = RecipeViewModel()
     
     var body: some Scene {
         WindowGroup {
-            Group {
-                if authVM.isLoggedIn {
-                    HomeView()
-                } else {
-                    LoginView()
-                }
-            }
-            .environmentObject(authVM)
+            ContentView()
+                .environmentObject(authVM)
+                .environmentObject(recipeVM)
         }
     }
 }
