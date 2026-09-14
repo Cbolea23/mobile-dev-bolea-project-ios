@@ -56,7 +56,7 @@ struct ProfileView: View {
                     VStack(spacing: 0) {
                         SettingListRow(emoji: "🥗", title: "Dietary Preferences", subtitle: "No restrictions")
                         Divider().padding(.leading, 52)
-                        SettingListRow(emoji: "🧑‍🍳", title: "Cooking Skill Level", subtitle: "Intermediate")
+                        SettingListRow(emoji: "🧑‍🍳", title: "Cooking Skill Level", subtitle: "No preference")
                         Divider().padding(.leading, 52)
                         SettingListRow(emoji: "🔔", title: "Notifications", subtitle: "Enabled")
                     }

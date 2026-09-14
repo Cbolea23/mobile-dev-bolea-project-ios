@@ -31,7 +31,7 @@ struct Meal: Codable, Identifiable {
     
     var id: String { idMeal }
 }
-
+ 
 struct RecipeItem: Identifiable, Codable, Equatable {
     let id: String
     let title: String
