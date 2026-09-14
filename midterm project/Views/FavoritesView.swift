@@ -15,7 +15,7 @@ struct FavoritesView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 14) {
                     
-                    // Header Title & Counter Badge
+                    // header title and counter badge
                     HStack {
                         Text("Mga Paborito")
                             .font(.system(size: 30, weight: .black, design: .rounded))

@@ -13,7 +13,6 @@ struct ContentView: View {
     @State private var selectedTab = 0
     
     init() {
-        // Style TabBar background to match the Figma cream color
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = UIColor(Color.ulamCream)

@@ -15,7 +15,7 @@ class RecipeViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var checkedIngredients: Set<String> = []
     
-    // Curated Filipino dish defaults for offline fallback & initial display
+    //default for offline fallback
     @Published var featuredMeal: RecipeItem = RecipeItem(
         id: "52854",
         title: "Pork Sinigang",
@@ -52,7 +52,7 @@ class RecipeViewModel: ObservableObject {
     
     private let savedMealsKey = "saved_ulam_meals"
 
-    // Automatically persists to device storage whenever an item is added or removed
+    // save on local
     @Published var savedMeals: [RecipeItem] = [] {
         didSet {
             if let encoded = try? JSONEncoder().encode(savedMeals) {
@@ -62,56 +62,24 @@ class RecipeViewModel: ObservableObject {
     }
 
     init() {
-        // 1. Restore saved favorites from disk if they exist
+        // Restore saved favorites from disk if theres one
         if let data = UserDefaults.standard.data(forKey: savedMealsKey),
            let decoded = try? JSONDecoder().decode([RecipeItem].self, from: data) {
             self.savedMeals = decoded
         } else {
-            // Default placeholder favorites for first launch
-            self.savedMeals = [
-                RecipeItem(
-                    id: "52856",
-                    title: "Chicken Mandi",
-                    nativeName: "Mandi Chicken",
-                    origin: "Yemeni",
-                    time: "38 min",
-                    servings: "4 servings",
-                    calories: "493 kcal",
-                    rating: "4.8",
-                    category: "Chicken",
-                    difficulty: "Medium",
-                    imageUrl: "https://www.themealdb.com/images/media/meals/utxwwv1511815787.jpg",
-                    ingredients: ["Chicken", "Basmati Rice", "Mandi Spices"],
-                    instructions: ["Cook rice and spiced chicken until tender."]
-                ),
-                RecipeItem(
-                    id: "52772",
-                    title: "Chicken Handi",
-                    nativeName: "Handi Chicken",
-                    origin: "Indian",
-                    time: "49 min",
-                    servings: "4 servings",
-                    calories: "427 kcal",
-                    rating: "4.9",
-                    category: "Chicken",
-                    difficulty: "Medium",
-                    imageUrl: "https://www.themealdb.com/images/media/meals/wyxwsp1486979827.jpg",
-                    ingredients: ["Chicken", "Onions", "Ghee", "Spices"],
-                    instructions: ["Simmer chicken in rich spiced gravy."]
-                )
-            ]
-        }
+                    self.savedMeals = []
+                }
 
-        // 2. Fetch live data
-        Task {
-            await fetchFeaturedLive()
-            await fetchMeals(for: "All")
-        }
-    }
+                // Fetch live data
+                Task {
+                    await fetchFeaturedLive()
+                    await fetchMeals(for: "All")
+                }
+            }
     
     // MARK: - Live API Calls
     
-    /// Fetches a random featured dish from TheMealDB
+    /// Fetches a random dish from api
     func fetchFeaturedLive() async {
         guard let url = URL(string: "https://www.themealdb.com/api/json/v1/1/random.php") else { return }
         do {
@@ -119,12 +87,10 @@ class RecipeViewModel: ObservableObject {
             if let decoded = parseMealLookup(data: data).first {
                 self.featuredMeal = decoded
             }
-        } catch {
-            // Keep default Sinigang on network failure
-        }
+        } catch { }
     }
     
-    /// Fetches meals filtered by category (Beef, Chicken, Pork, Seafood)
+    /// get meals by category (Beef, Chicken, Pork, Seafood)
     func fetchMeals(for category: String) async {
         self.selectedCategory = category
         self.isLoading = true
@@ -166,7 +132,7 @@ class RecipeViewModel: ObservableObject {
         }
     }
     
-    /// Searches meals by query keyword
+    /// search meals
     func searchMeals(query: String) async {
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
             await fetchMeals(for: selectedCategory)
@@ -189,7 +155,7 @@ class RecipeViewModel: ObservableObject {
         }
     }
     
-    /// Fetches the full ingredients checklist and step-by-step instructions for a tapped recipe
+    /// getting full detail
     func fetchRecipeDetails(id: String) async -> RecipeItem? {
         guard let url = URL(string: "https://www.themealdb.com/api/json/v1/1/lookup.php?i=\(id)") else { return nil }
         do {
@@ -223,7 +189,7 @@ class RecipeViewModel: ObservableObject {
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty && $0.count > 10 }
             
-            // Extract ingredients (TheMealDB dynamically provides up to 20 slots)
+            // for converting the ingredients
             var ingredients: [String] = []
             for i in 1...20 {
                 if let ing = dict["strIngredient\(i)"] as? String, !ing.trimmingCharacters(in: .whitespaces).isEmpty {

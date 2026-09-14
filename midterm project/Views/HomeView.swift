@@ -7,8 +7,6 @@
 
 import SwiftUI
 
-import SwiftUI
-
 struct HomeView: View {
     @EnvironmentObject var recipeVM: RecipeViewModel
     @State private var search = ""
@@ -42,7 +40,7 @@ struct HomeView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     
-                    // Live Search Bar
+                    // search Bar
                     HStack(spacing: 10) {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.secondary)
@@ -98,16 +96,18 @@ struct HomeView: View {
                         .padding(.horizontal, 20)
                     }
                     
-                    // Ulam ng Araw (Featured Live Card)
+                    // Ulam ng Araw
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Ulam ng Araw")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(Color.ulamTextDark)
                             Spacer()
-                            Text("Tingnan lahat")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.ulamOrange)
+                            NavigationLink(destination: RecipeListView()) {
+                                Text("Tingnan lahat")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.ulamOrange)
+                            }
                         }
                         
                         NavigationLink(destination: RecipeDetailView(recipe: recipeVM.featuredMeal)) {
@@ -172,16 +172,18 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, 20)
                     
-                    // Sikat na Lutuin Live Grid
+                    // Sikat na Lutuin
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Text("Sikat na Lutuin")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(Color.ulamTextDark)
                             Spacer()
-                            Text("Lahat")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.ulamOrange)
+                            NavigationLink(destination: RecipeListView()) {
+                                Text("Lahat")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.ulamOrange)
+                            }
                         }
                         
                         if recipeVM.isLoading {

@@ -14,7 +14,7 @@ struct ProfileView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
                 
-                // Profile Avatar and Identity
+                // profile
                 VStack(spacing: 8) {
                     Circle()
                         .fill(Color.ulamOrange)
@@ -36,7 +36,7 @@ struct ProfileView: View {
                 }
                 .padding(.top, 16)
                 
-                // 3 Metric Stat Row
+                // 3 stats
                 HStack {
                     ProfileStatColumn(number: "12", title: "Recipes")
                     Divider().frame(height: 28)
@@ -46,7 +46,7 @@ struct ProfileView: View {
                 }
                 .padding(.vertical, 4)
                 
-                // MGA SETTING Section
+                // settings
                 VStack(alignment: .leading, spacing: 8) {
                     Text("MGA SETTING")
                         .font(.system(size: 11, weight: .bold))
@@ -106,7 +106,7 @@ struct ProfileView: View {
                         .background(Color.white.opacity(0.16))
                         .cornerRadius(12)
                         
-                        Link(destination: URL(string: "https://github.com/Cbolea23/IOS-PROJECT-NGANI")!) {
+                        Link(destination: URL(string: "https://github.com/Cbolea23/mobile-dev-bolea-project-ios")!) {
                             HStack(spacing: 8) {
                                 Image(systemName: "link")
                                 Text("GitHub Repository")
@@ -126,7 +126,7 @@ struct ProfileView: View {
                     .padding(.horizontal, 20)
                 }
                 
-                // Sign Out Action
+                // signout button
                 Button(action: {
                     authVM.logout()
                 }) {

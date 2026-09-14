@@ -33,7 +33,7 @@ struct LoginView: View {
                             .foregroundColor(.ulamOrange)
                     }
                     
-                    // Brand Title and Tagline
+                    // brand and tagline
                     VStack(spacing: 6) {
                         Text("Anong\nUlam?")
                             .font(.system(size: 40, weight: .black, design: .rounded))
@@ -45,7 +45,7 @@ struct LoginView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    // Discover Pill Banner
+                    // banner
                     HStack(spacing: 8) {
                         Image(systemName: "sparkle.magnifyingglass")
                             .font(.system(size: 15, weight: .bold))
@@ -64,7 +64,7 @@ struct LoginView: View {
                     )
                     .padding(.horizontal, 24)
                     
-                    // Input Fields
+                    // Input
                     VStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("EMAIL")
@@ -111,7 +111,7 @@ struct LoginView: View {
                     }
                     .padding(.horizontal, 24)
                     
-                    // Sign-In Button
+                    // button
                     Button(action: {
                         authVM.login(email: email, password: password)
                     }) {

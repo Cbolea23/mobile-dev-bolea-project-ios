@@ -72,7 +72,7 @@ struct RecipeDetailView: View {
                         .frame(height: 290)
                     }
                     
-                    // Recipe Title & Quick Badges
+                    // Recipe Title and Badges
                     VStack(alignment: .leading, spacing: 10) {
                         Text(recipe.title)
                             .font(.system(size: 26, weight: .black, design: .rounded))
@@ -110,7 +110,7 @@ struct RecipeDetailView: View {
                     }
                     .padding(.horizontal, 20)
                     
-                    // 3 Stat Metric Cards
+                    // 3 Stats metric
                     HStack(spacing: 12) {
                         StatCard(value: recipe.calories, label: "Calories")
                         StatCard(value: "\(recipe.rating)★", label: "Rating")
@@ -118,7 +118,7 @@ struct RecipeDetailView: View {
                     }
                     .padding(.horizontal, 20)
                     
-                    // Segmented Tabs ("Mga Sangkap" vs "Paraan")
+                    // Mga Sangkap and Paraan
                     HStack(spacing: 0) {
                         Button(action: { selectedTab = 0 }) {
                             Text("Mga Sangkap")
@@ -147,7 +147,7 @@ struct RecipeDetailView: View {
                     .cornerRadius(12)
                     .padding(.horizontal, 20)
                     
-                    // Tab Content (Live Data from API)
+                    // Tab Content from api data
                     if isLoadingDetails {
                         HStack {
                             Spacer()
