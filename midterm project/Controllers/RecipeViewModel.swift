@@ -49,9 +49,60 @@ class RecipeViewModel: ObservableObject {
     )
     
     @Published var popularMeals: [RecipeItem] = []
-    @Published var savedMeals: [RecipeItem] = []
     
+    private let savedMealsKey = "saved_ulam_meals"
+
+    // Automatically persists to device storage whenever an item is added or removed
+    @Published var savedMeals: [RecipeItem] = [] {
+        didSet {
+            if let encoded = try? JSONEncoder().encode(savedMeals) {
+                UserDefaults.standard.set(encoded, forKey: savedMealsKey)
+            }
+        }
+    }
+
     init() {
+        // 1. Restore saved favorites from disk if they exist
+        if let data = UserDefaults.standard.data(forKey: savedMealsKey),
+           let decoded = try? JSONDecoder().decode([RecipeItem].self, from: data) {
+            self.savedMeals = decoded
+        } else {
+            // Default placeholder favorites for first launch
+            self.savedMeals = [
+                RecipeItem(
+                    id: "52856",
+                    title: "Chicken Mandi",
+                    nativeName: "Mandi Chicken",
+                    origin: "Yemeni",
+                    time: "38 min",
+                    servings: "4 servings",
+                    calories: "493 kcal",
+                    rating: "4.8",
+                    category: "Chicken",
+                    difficulty: "Medium",
+                    imageUrl: "https://www.themealdb.com/images/media/meals/utxwwv1511815787.jpg",
+                    ingredients: ["Chicken", "Basmati Rice", "Mandi Spices"],
+                    instructions: ["Cook rice and spiced chicken until tender."]
+                ),
+                RecipeItem(
+                    id: "52772",
+                    title: "Chicken Handi",
+                    nativeName: "Handi Chicken",
+                    origin: "Indian",
+                    time: "49 min",
+                    servings: "4 servings",
+                    calories: "427 kcal",
+                    rating: "4.9",
+                    category: "Chicken",
+                    difficulty: "Medium",
+                    imageUrl: "https://www.themealdb.com/images/media/meals/wyxwsp1486979827.jpg",
+                    ingredients: ["Chicken", "Onions", "Ghee", "Spices"],
+                    instructions: ["Simmer chicken in rich spiced gravy."]
+                )
+            ]
+        }
+
+        // 2. Fetch live data
         Task {
             await fetchFeaturedLive()
             await fetchMeals(for: "All")
