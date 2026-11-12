@@ -90,7 +90,7 @@ class RecipeViewModel: ObservableObject {
         } catch { }
     }
     
-    /// get meals by category (Beef, Chicken, Pork, Seafood)
+    /// get meals by category
     func fetchMeals(for category: String) async {
         self.selectedCategory = category
         self.isLoading = true
