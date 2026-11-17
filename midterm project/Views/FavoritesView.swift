@@ -37,18 +37,52 @@ struct FavoritesView: View {
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 20)
                     
-                    // Grid of Bookmarked Recipes
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
-                        ForEach(recipeVM.savedMeals) { meal in
-                            NavigationLink(destination: RecipeDetailView(recipe: meal)) {
-                                SavedDishCard(meal: meal)
+                    if recipeVM.savedMeals.isEmpty {
+                        VStack(spacing: 14) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.ulamLightOrange)
+                                    .frame(width: 72, height: 72)
+                                Image(systemName: "heart.slash")
+                                    .font(.system(size: 30, weight: .semibold))
+                                    .foregroundColor(.ulamOrange)
                             }
-                            .buttonStyle(PlainButtonStyle())
+                            
+                            Text("Wala pang Paboritong Ulam")
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundColor(Color.ulamTextDark)
+                            
+                            Text("I-tap ang puso o bookmark icon sa anumang recipe sa Home para ma-save ito sa iyong account.")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 12)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 44)
+                        .padding(.horizontal, 20)
+                        .background(Color.ulamCard)
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.ulamBorder, lineWidth: 1)
+                        )
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                    } else {
+                        // Grid of Bookmarked Recipes
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
+                            ForEach(recipeVM.savedMeals) { meal in
+                                NavigationLink(destination: RecipeDetailView(recipe: meal)) {
+                                    SavedDishCard(meal: meal)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 6)
+                        .padding(.bottom, 30)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 6)
-                    .padding(.bottom, 30)
                 }
             }
             .background(Color.ulamCream.ignoresSafeArea())

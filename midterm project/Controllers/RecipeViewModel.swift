@@ -13,9 +13,14 @@ class RecipeViewModel: ObservableObject {
     @Published var selectedCategory: String = "All"
     @Published var searchText: String = ""
     @Published var isLoading: Bool = false
+    @Published var errorMessage: String? = nil
     @Published var checkedIngredients: Set<String> = []
+    @Published var cookedMealIds: Set<String> = []
     
-    //default for offline fallback
+    private(set) var currentAccountEmail: String = DatabaseService.defaultEmail
+    private var isSyncingAccount = false
+    
+    // Default for offline fallback
     @Published var featuredMeal: RecipeItem = RecipeItem(
         id: "52854",
         title: "Pork Sinigang",
@@ -23,7 +28,7 @@ class RecipeViewModel: ObservableObject {
         origin: "Filipino",
         time: "1 hr",
         servings: "6 servings",
-        calories: "310",
+        calories: "310 kcal",
         rating: "4.8",
         category: "Pork",
         difficulty: "Medium",
@@ -50,36 +55,51 @@ class RecipeViewModel: ObservableObject {
     
     @Published var popularMeals: [RecipeItem] = []
     
-    private let savedMealsKey = "saved_ulam_meals"
-
-    // save on local
     @Published var savedMeals: [RecipeItem] = [] {
         didSet {
-            if let encoded = try? JSONEncoder().encode(savedMeals) {
-                UserDefaults.standard.set(encoded, forKey: savedMealsKey)
+            if !isSyncingAccount {
+                persistUserState()
             }
         }
     }
-
+    
     init() {
-        // Restore saved favorites from disk if theres one
-        if let data = UserDefaults.standard.data(forKey: savedMealsKey),
-           let decoded = try? JSONDecoder().decode([RecipeItem].self, from: data) {
-            self.savedMeals = decoded
-        } else {
-                    self.savedMeals = []
-                }
-
-                // Fetch live data
-                Task {
-                    await fetchFeaturedLive()
-                    await fetchMeals(for: "All")
-                }
-            }
+        syncForUser(email: DatabaseService.defaultEmail)
+        
+        // Fetch live data
+        Task {
+            await fetchFeaturedLive()
+            await fetchMeals(for: "All")
+        }
+    }
+    
+    // MARK: - User Account Synchronization
+    
+    func syncForUser(email: String) {
+        let normalized = DatabaseService.normalizeEmail(email)
+        currentAccountEmail = normalized
+        let account = DatabaseService.shared.loadUserAccount(email: normalized)
+        
+        isSyncingAccount = true
+        self.savedMeals = account.savedMeals
+        self.cookedMealIds = Set(account.cookedMealIds)
+        isSyncingAccount = false
+    }
+    
+    private func persistUserState() {
+        var account = DatabaseService.shared.loadUserAccount(email: currentAccountEmail)
+        account.savedMeals = savedMeals
+        account.cookedMealIds = Array(cookedMealIds).sorted()
+        account.profile.savedCount = savedMeals.count
+        account.profile.cookedCount = max(account.profile.cookedCount, cookedMealIds.count)
+        Task {
+            await DatabaseService.shared.saveUserAccount(account)
+        }
+    }
     
     // MARK: - Live API Calls
     
-    /// Fetches a random dish from api
+    /// Fetches a random dish from API
     func fetchFeaturedLive() async {
         guard let url = URL(string: "https://www.themealdb.com/api/json/v1/1/random.php") else { return }
         do {
@@ -87,20 +107,24 @@ class RecipeViewModel: ObservableObject {
             if let decoded = parseMealLookup(data: data).first {
                 self.featuredMeal = decoded
             }
-        } catch { }
+        } catch {
+            // Keep offline Pork Sinigang fallback if network is unavailable
+        }
     }
     
-    /// get meals by category
+    /// Get meals by category
     func fetchMeals(for category: String) async {
         self.selectedCategory = category
         self.isLoading = true
+        self.errorMessage = nil
         defer { self.isLoading = false }
         
         let endpoint: String
         if category == "All" {
             endpoint = "https://www.themealdb.com/api/json/v1/1/search.php?s=chicken"
         } else {
-            endpoint = "https://www.themealdb.com/api/json/v1/1/filter.php?c=\(category)"
+            let encodedCategory = category.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? category
+            endpoint = "https://www.themealdb.com/api/json/v1/1/filter.php?c=\(encodedCategory)"
         }
         
         guard let url = URL(string: endpoint) else { return }
@@ -109,53 +133,59 @@ class RecipeViewModel: ObservableObject {
             let (data, _) = try await URLSession.shared.data(from: url)
             let result = try JSONDecoder().decode(MealResponse.self, from: data)
             if let fetched = result.meals {
-                self.popularMeals = fetched.prefix(8).map { meal in
-                    RecipeItem(
+                self.popularMeals = fetched.prefix(10).map { meal in
+                    let meta = deterministicMetadata(for: meal.idMeal, stepCount: nil)
+                    return RecipeItem(
                         id: meal.idMeal,
                         title: meal.strMeal,
-                        nativeName: "\(category) Special",
+                        nativeName: category == "All" ? "Chef's Pick" : "\(category) Special",
                         origin: "International",
-                        time: "\(Int.random(in: 25...55)) min",
+                        time: meta.time,
                         servings: "4 servings",
-                        calories: "\(Int.random(in: 320...580)) kcal",
-                        rating: String(format: "%.1f", Double.random(in: 4.5...5.0)),
+                        calories: meta.calories,
+                        rating: meta.rating,
                         category: category == "All" ? "Chef's Pick" : category,
-                        difficulty: ["Easy", "Medium", "Hard"].randomElement() ?? "Medium",
+                        difficulty: meta.difficulty,
                         imageUrl: meal.strMealThumb,
                         ingredients: [],
                         instructions: []
                     )
                 }
+            } else {
+                self.popularMeals = []
             }
         } catch {
+            self.errorMessage = "Hindi ma-load ang mga recipe. Pakisuri ang iyong internet connection."
             print("API Error: \(error.localizedDescription)")
         }
     }
     
-    /// search meals
+    /// Search meals
     func searchMeals(query: String) async {
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.searchText = trimmed
+        guard !trimmed.isEmpty else {
             await fetchMeals(for: selectedCategory)
             return
         }
         self.isLoading = true
+        self.errorMessage = nil
         defer { self.isLoading = false }
         
-        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+        guard let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://www.themealdb.com/api/json/v1/1/search.php?s=\(encoded)") else { return }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let parsed = parseMealLookup(data: data)
-            if !parsed.isEmpty {
-                self.popularMeals = parsed
-            }
+            self.popularMeals = parsed
         } catch {
+            self.errorMessage = "Nagkaproblema sa paghahanap. Subukan muli."
             print("Search API Error: \(error.localizedDescription)")
         }
     }
     
-    /// getting full detail
+    /// Getting full detail
     func fetchRecipeDetails(id: String) async -> RecipeItem? {
         guard let url = URL(string: "https://www.themealdb.com/api/json/v1/1/lookup.php?i=\(id)") else { return nil }
         do {
@@ -166,7 +196,7 @@ class RecipeViewModel: ObservableObject {
         }
     }
     
-    // MARK: - JSON Parser Helper for TheMealDB
+    // MARK: - JSON Parser & Deterministic Metadata Helpers
     
     private func parseMealLookup(data: Data) -> [RecipeItem] {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -185,11 +215,11 @@ class RecipeViewModel: ObservableObject {
             
             // Clean instructions into steps
             let steps = instructionsRaw
-                .components(separatedBy: "\r\n")
-                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .components(separatedBy: CharacterSet.newlines)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                 .filter { !$0.isEmpty && $0.count > 10 }
             
-            // for converting the ingredients
+            // Convert ingredients
             var ingredients: [String] = []
             for i in 1...20 {
                 if let ing = dict["strIngredient\(i)"] as? String, !ing.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -199,22 +229,60 @@ class RecipeViewModel: ObservableObject {
                 }
             }
             
+            let meta = deterministicMetadata(for: id, stepCount: steps.count)
+            
             return RecipeItem(
                 id: id,
                 title: name,
                 nativeName: "\(area) Classic",
                 origin: area,
-                time: "\(Int.random(in: 25...60)) min",
+                time: meta.time,
                 servings: "4-6 servings",
-                calories: "\(Int.random(in: 350...650)) kcal",
-                rating: String(format: "%.1f", Double.random(in: 4.6...4.9)),
+                calories: meta.calories,
+                rating: meta.rating,
                 category: category,
-                difficulty: steps.count > 4 ? "Medium" : "Easy",
+                difficulty: meta.difficulty,
                 imageUrl: thumb,
                 ingredients: ingredients,
                 instructions: steps.isEmpty ? [instructionsRaw] : steps
             )
         }
+    }
+    
+    private func deterministicMetadata(for id: String, stepCount: Int?) -> (time: String, calories: String, rating: String, difficulty: String) {
+        let seed = stableSeed(for: id)
+        let minutes = 20 + (seed % 36)
+        let kcal = 310 + ((seed / 7) % 320)
+        let ratingValue = 4.5 + Double((seed / 13) % 6) * 0.1
+        
+        let difficulty: String
+        if let stepCount {
+            if stepCount > 6 {
+                difficulty = "Hard"
+            } else if stepCount > 3 {
+                difficulty = "Medium"
+            } else {
+                difficulty = "Easy"
+            }
+        } else {
+            let options = ["Easy", "Medium", "Hard"]
+            difficulty = options[(seed / 3) % options.count]
+        }
+        
+        return (
+            time: "\(minutes) min",
+            calories: "\(kcal) kcal",
+            rating: String(format: "%.1f", ratingValue),
+            difficulty: difficulty
+        )
+    }
+    
+    private func stableSeed(for value: String) -> Int {
+        var hash = 5381
+        for scalar in value.unicodeScalars {
+            hash = ((hash &<< 5) &+ hash) &+ Int(scalar.value)
+        }
+        return abs(hash)
     }
     
     // MARK: - User Action Handlers
@@ -233,6 +301,17 @@ class RecipeViewModel: ObservableObject {
     
     func removeSaved(id: String) {
         savedMeals.removeAll(where: { $0.id == id })
+    }
+    
+    func isCooked(meal: RecipeItem) -> Bool {
+        cookedMealIds.contains(meal.id)
+    }
+    
+    @discardableResult
+    func markAsCooked(meal: RecipeItem) -> Int {
+        cookedMealIds.insert(meal.id)
+        persistUserState()
+        return cookedMealIds.count
     }
     
     func toggleIngredient(_ ingredient: String) {

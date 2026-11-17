@@ -12,6 +12,10 @@ struct midterm_projectApp: App {
     @StateObject private var authVM = AuthViewModel()
     @StateObject private var recipeVM = RecipeViewModel()
     
+    init() {
+        DatabaseService.shared.configureIfNeeded()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()

@@ -51,5 +51,18 @@ struct ContentView: View {
                 .tint(Color.ulamOrange)
             }
         }
+        .onAppear {
+            recipeVM.syncForUser(email: authVM.currentUserEmail)
+        }
+        .onChange(of: authVM.currentUserEmail) { _, newEmail in
+            recipeVM.syncForUser(email: newEmail)
+        }
+        .onChange(of: authVM.isAuthenticated) { _, isAuth in
+            if isAuth {
+                recipeVM.syncForUser(email: authVM.currentUserEmail)
+            } else {
+                selectedTab = 0
+            }
+        }
     }
 }

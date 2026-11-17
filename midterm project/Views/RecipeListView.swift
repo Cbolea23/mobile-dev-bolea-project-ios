@@ -31,17 +31,46 @@ struct RecipeListView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 14)
                 
-                // Vertical Dish Cards
-                LazyVStack(spacing: 14) {
-                    ForEach(recipeVM.popularMeals) { meal in
-                        NavigationLink(destination: RecipeDetailView(recipe: meal)) {
-                            RecipeRowCard(meal: meal)
+                if recipeVM.popularMeals.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "fork.knife.circle")
+                            .font(.system(size: 40))
+                            .foregroundColor(.ulamOrange)
+                        Text("Walang nakitang lutuin")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(Color.ulamTextDark)
+                        Text("Subukan i-reload o pumili ng ibang kategorya sa Home.")
+                            .font(.system(size: 13))
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button("I-load Muli") {
+                            Task {
+                                await recipeVM.fetchMeals(for: recipeVM.selectedCategory)
+                            }
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(Color.ulamOrange)
+                        .cornerRadius(12)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    .padding(.horizontal, 20)
+                } else {
+                    // Vertical Dish Cards
+                    LazyVStack(spacing: 14) {
+                        ForEach(recipeVM.popularMeals) { meal in
+                            NavigationLink(destination: RecipeDetailView(recipe: meal)) {
+                                RecipeRowCard(meal: meal)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
             }
         }
         .background(Color.ulamCream.ignoresSafeArea())
@@ -50,6 +79,7 @@ struct RecipeListView: View {
 }
 
 struct RecipeRowCard: View {
+    @EnvironmentObject var recipeVM: RecipeViewModel
     let meal: RecipeItem
     
     var body: some View {
@@ -69,6 +99,7 @@ struct RecipeRowCard: View {
                 Text(meal.title)
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Color.ulamTextDark)
+                    .lineLimit(1)
                 
                 Text(meal.nativeName)
                     .font(.system(size: 12))
@@ -85,6 +116,18 @@ struct RecipeRowCard: View {
             }
             
             Spacer()
+            
+            Button(action: {
+                recipeVM.toggleSave(meal: meal)
+            }) {
+                Image(systemName: recipeVM.isSaved(meal: meal) ? "heart.fill" : "heart")
+                    .font(.system(size: 15, weight: .bold))
+                    .padding(8)
+                    .background(recipeVM.isSaved(meal: meal) ? Color.ulamLightOrange : Color.black.opacity(0.05))
+                    .foregroundColor(recipeVM.isSaved(meal: meal) ? .ulamOrange : .secondary)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(PlainButtonStyle())
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .semibold))

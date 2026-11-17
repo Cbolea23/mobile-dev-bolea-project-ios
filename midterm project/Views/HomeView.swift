@@ -8,9 +8,24 @@
 import SwiftUI
 
 struct HomeView: View {
+    @EnvironmentObject var authVM: AuthViewModel
     @EnvironmentObject var recipeVM: RecipeViewModel
     @State private var search = ""
     let categories = ["All", "Beef", "Chicken", "Pork", "Seafood"]
+    
+    private var avatarInitial: String {
+        let trimmed = authVM.currentUserName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return String(trimmed.prefix(1)).uppercased().isEmpty ? "C" : String(trimmed.prefix(1)).uppercased()
+    }
+    
+    private var listCategoryTitle: String {
+        if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Results: \(search)"
+        }
+        return recipeVM.selectedCategory == "All"
+            ? "Mga Lutuing Pinoy"
+            : "\(recipeVM.selectedCategory) Dishes"
+    }
     
     var body: some View {
         NavigationStack {
@@ -23,7 +38,7 @@ struct HomeView: View {
                             Text("Magandang umaga")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary)
-                            Text("Tara, luto tayo, Christian!")
+                            Text("Tara, luto tayo, \(authVM.currentUserName)!")
                                 .font(.system(size: 22, weight: .bold, design: .rounded))
                                 .foregroundColor(Color.ulamTextDark)
                         }
@@ -32,7 +47,7 @@ struct HomeView: View {
                             .fill(Color.ulamOrange)
                             .frame(width: 44, height: 44)
                             .overlay(
-                                Text("C")
+                                Text(avatarInitial)
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundColor(.white)
                             )
@@ -87,6 +102,7 @@ struct HomeView: View {
                                             .stroke(recipeVM.selectedCategory == cat ? Color.clear : Color.ulamBorder, lineWidth: 1)
                                     )
                                     .onTapGesture {
+                                        search = ""
                                         Task {
                                             await recipeVM.fetchMeals(for: cat)
                                         }
@@ -103,7 +119,7 @@ struct HomeView: View {
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(Color.ulamTextDark)
                             Spacer()
-                            NavigationLink(destination: RecipeListView()) {
+                            NavigationLink(destination: RecipeListView(categoryName: listCategoryTitle)) {
                                 Text("Tingnan lahat")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(.ulamOrange)
@@ -179,7 +195,7 @@ struct HomeView: View {
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(Color.ulamTextDark)
                             Spacer()
-                            NavigationLink(destination: RecipeListView()) {
+                            NavigationLink(destination: RecipeListView(categoryName: listCategoryTitle)) {
                                 Text("Lahat")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(.ulamOrange)
@@ -194,6 +210,71 @@ struct HomeView: View {
                                     .padding(.vertical, 30)
                                 Spacer()
                             }
+                        } else if let error = recipeVM.errorMessage, recipeVM.popularMeals.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "wifi.exclamationmark")
+                                    .font(.system(size: 30))
+                                    .foregroundColor(.ulamOrange)
+                                Text(error)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                Button("Subukan Muli") {
+                                    Task {
+                                        await recipeVM.fetchFeaturedLive()
+                                        await recipeVM.fetchMeals(for: recipeVM.selectedCategory)
+                                    }
+                                }
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 10)
+                                .background(Color.ulamOrange)
+                                .cornerRadius(12)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 28)
+                            .padding(.horizontal, 16)
+                            .background(Color.ulamCard)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.ulamBorder, lineWidth: 1)
+                            )
+                        } else if recipeVM.popularMeals.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.ulamOrange)
+                                Text("Walang nahanap na recipe")
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundColor(Color.ulamTextDark)
+                                Text("Subukan ang ibang pangalan ng ulam o i-reset ang filter.")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                Button("I-reset") {
+                                    search = ""
+                                    Task {
+                                        await recipeVM.fetchMeals(for: "All")
+                                    }
+                                }
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 10)
+                                .background(Color.ulamOrange)
+                                .cornerRadius(12)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 28)
+                            .padding(.horizontal, 16)
+                            .background(Color.ulamCard)
+                            .cornerRadius(16)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.ulamBorder, lineWidth: 1)
+                            )
                         } else {
                             LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
                                 ForEach(recipeVM.popularMeals) { meal in

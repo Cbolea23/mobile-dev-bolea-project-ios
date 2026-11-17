@@ -9,11 +9,13 @@ import SwiftUI
 
 struct RecipeDetailView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var authVM: AuthViewModel
     @EnvironmentObject var recipeVM: RecipeViewModel
     
     @State var recipe: RecipeItem
     @State private var selectedTab: Int = 0
     @State private var isLoadingDetails: Bool = false
+    @State private var showCookingMode: Bool = false
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -221,7 +223,7 @@ struct RecipeDetailView: View {
             }
             .task {
                 // Fetch full ingredients & instructions if not yet loaded
-                if recipe.ingredients.isEmpty {
+                if recipe.ingredients.isEmpty || recipe.instructions.isEmpty {
                     self.isLoadingDetails = true
                     if let full = await recipeVM.fetchRecipeDetails(id: recipe.id) {
                         self.recipe = full
@@ -231,8 +233,12 @@ struct RecipeDetailView: View {
             }
             
             // Bottom Action Button
-            Button(action: {}) {
-                Text("Magsimula ng Pagluluto")
+            Button(action: {
+                showCookingMode = true
+            }) {
+                Text(recipeVM.isCooked(meal: recipe)
+                     ? "Lutuing Muli (Naluto Na ✓)"
+                     : "Magsimula ng Pagluluto")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
@@ -241,6 +247,7 @@ struct RecipeDetailView: View {
                     .cornerRadius(16)
                     .shadow(color: Color.ulamOrange.opacity(0.35), radius: 8, x: 0, y: 4)
             }
+            .disabled(isLoadingDetails)
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
             .background(
@@ -256,6 +263,13 @@ struct RecipeDetailView: View {
         .background(Color.ulamCream.ignoresSafeArea())
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .top)
+        .sheet(isPresented: $showCookingMode) {
+            CookingModeView(recipe: recipe) {
+                let total = recipeVM.markAsCooked(meal: recipe)
+                authVM.recordCookedCount(total)
+            }
+            .environmentObject(recipeVM)
+        }
     }
 }
 
