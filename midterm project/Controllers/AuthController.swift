@@ -1,5 +1,5 @@
 //
-//  AuthViewModel.swift
+//  AuthController.swift
 //  midterm project
 //
 //  Created by louis on 9/13/26.
@@ -8,8 +8,10 @@
 import Foundation
 import Combine
 
+typealias AuthViewModel = AuthController
+
 @MainActor
-class AuthViewModel: ObservableObject {
+class AuthController: ObservableObject {
     @Published var isAuthenticated: Bool = false
     @Published var currentUserEmail: String = DatabaseService.defaultEmail
     @Published var currentUserName: String = "Christian"
@@ -37,7 +39,7 @@ class AuthViewModel: ObservableObject {
         clearMessages()
         let cleanEmail = DatabaseService.normalizeEmail(email)
         
-        guard !cleanEmail.isEmpty, cleanEmail.contains("@") else {
+        guard isValidEmail(cleanEmail) else {
             authError = "Maglagay ng wastong email address."
             return
         }
@@ -67,12 +69,12 @@ class AuthViewModel: ObservableObject {
             authError = "Pakilagay ang iyong pangalan o username."
             return
         }
-        guard !cleanEmail.isEmpty, cleanEmail.contains("@"), cleanEmail.contains(".") else {
+        guard isValidEmail(cleanEmail) else {
             authError = "Maglagay ng wastong email address."
             return
         }
-        guard password.count >= 4 else {
-            authError = "Ang password ay dapat may hindi bababa sa 4 na character."
+        guard password.count >= 6 else {
+            authError = "Ang password ay dapat may hindi bababa sa 6 na character."
             return
         }
         guard password == confirmPassword else {
@@ -100,13 +102,13 @@ class AuthViewModel: ObservableObject {
         clearMessages()
         let cleanEmail = DatabaseService.normalizeEmail(email)
         
-        guard !cleanEmail.isEmpty, cleanEmail.contains("@") else {
+        guard isValidEmail(cleanEmail) else {
             authError = "Maglagay ng wastong email address."
             return false
         }
         
-        if !DatabaseService.shared.isFirebaseActive && newPassword.count < 4 {
-            authError = "Ang bagong password ay dapat may hindi bababa sa 4 na character."
+        if !DatabaseService.shared.isFirebaseActive && newPassword.count < 6 {
+            authError = "Ang bagong password ay dapat may hindi bababa sa 6 na character."
             return false
         }
         
@@ -179,5 +181,24 @@ class AuthViewModel: ObservableObject {
         currentUserEmail = account.email
         currentUserName = account.username
         userProfile = account.profile
+    }
+    
+    func isValidEmail(_ email: String) -> Bool {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else {
+            return false
+        }
+        let parts = trimmed.split(separator: "@", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              !parts[0].isEmpty else {
+            return false
+        }
+        let domainParts = parts[1].split(separator: ".", omittingEmptySubsequences: false)
+        guard domainParts.count >= 2,
+              domainParts.allSatisfy({ !$0.isEmpty }) else {
+            return false
+        }
+        return true
     }
 }

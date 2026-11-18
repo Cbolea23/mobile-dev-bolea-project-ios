@@ -8,13 +8,17 @@
 import SwiftUI
 
 struct HomeView: View {
-    @EnvironmentObject var authVM: AuthViewModel
-    @EnvironmentObject var recipeVM: RecipeViewModel
+    @EnvironmentObject var authController: AuthController
+    @EnvironmentObject var recipeController: RecipeController
+    @Binding var selectedTab: Int
     @State private var search = ""
-    let categories = ["All", "Beef", "Chicken", "Pork", "Seafood"]
+    
+    init(selectedTab: Binding<Int> = .constant(0)) {
+        _selectedTab = selectedTab
+    }
     
     private var avatarInitial: String {
-        let trimmed = authVM.currentUserName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = authController.currentUserName.trimmingCharacters(in: .whitespacesAndNewlines)
         return String(trimmed.prefix(1)).uppercased().isEmpty ? "C" : String(trimmed.prefix(1)).uppercased()
     }
     
@@ -22,9 +26,14 @@ struct HomeView: View {
         if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return "Results: \(search)"
         }
-        return recipeVM.selectedCategory == "All"
+        return recipeController.selectedCategory == "All"
             ? "Mga Lutuing Pinoy"
-            : "\(recipeVM.selectedCategory) Dishes"
+            : "\(recipeController.selectedCategory) Dishes"
+    }
+    
+    private var hasActivePreferences: Bool {
+        recipeController.dietaryPreference != "No restrictions" ||
+        recipeController.skillLevel != "No preference"
     }
     
     var body: some View {
@@ -38,24 +47,29 @@ struct HomeView: View {
                             Text("Magandang umaga")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary)
-                            Text("Tara, luto tayo, \(authVM.currentUserName)!")
+                            Text("Tara, luto tayo, \(authController.currentUserName)!")
                                 .font(.system(size: 22, weight: .bold, design: .rounded))
                                 .foregroundColor(Color.ulamTextDark)
                         }
                         Spacer()
-                        Circle()
-                            .fill(Color.ulamOrange)
-                            .frame(width: 44, height: 44)
-                            .overlay(
-                                Text(avatarInitial)
-                                    .font(.system(size: 18, weight: .bold))
-                                    .foregroundColor(.white)
-                            )
+                        Button(action: {
+                            selectedTab = 2
+                        }) {
+                            Circle()
+                                .fill(Color.ulamOrange)
+                                .frame(width: 44, height: 44)
+                                .overlay(
+                                    Text(avatarInitial)
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.white)
+                                )
+                        }
+                        .accessibilityLabel("Buksan ang Profile")
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     
-                    // search Bar
+                    // Search Bar
                     HStack(spacing: 10) {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.secondary)
@@ -63,13 +77,13 @@ struct HomeView: View {
                             .font(.system(size: 14))
                             .onSubmit {
                                 Task {
-                                    await recipeVM.searchMeals(query: search)
+                                    await recipeController.searchMeals(query: search)
                                 }
                             }
                         if !search.isEmpty {
                             Button(action: {
                                 search = ""
-                                Task { await recipeVM.fetchMeals(for: recipeVM.selectedCategory) }
+                                Task { await recipeController.fetchMeals(for: recipeController.selectedCategory) }
                             }) {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(.secondary)
@@ -89,25 +103,57 @@ struct HomeView: View {
                     // Live Category Filter Pills
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 10) {
-                            ForEach(categories, id: \.self) { cat in
+                            ForEach(recipeController.availableCategories, id: \.self) { cat in
                                 Text(cat)
                                     .font(.system(size: 13, weight: .semibold))
                                     .padding(.horizontal, 18)
                                     .padding(.vertical, 8)
-                                    .background(recipeVM.selectedCategory == cat ? Color.ulamOrange : Color.ulamCard)
-                                    .foregroundColor(recipeVM.selectedCategory == cat ? .white : Color.ulamTextDark)
+                                    .background(recipeController.selectedCategory == cat ? Color.ulamOrange : Color.ulamCard)
+                                    .foregroundColor(recipeController.selectedCategory == cat ? .white : Color.ulamTextDark)
                                     .cornerRadius(20)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 20)
-                                            .stroke(recipeVM.selectedCategory == cat ? Color.clear : Color.ulamBorder, lineWidth: 1)
+                                            .stroke(recipeController.selectedCategory == cat ? Color.clear : Color.ulamBorder, lineWidth: 1)
                                     )
                                     .onTapGesture {
                                         search = ""
                                         Task {
-                                            await recipeVM.fetchMeals(for: cat)
+                                            await recipeController.fetchMeals(for: cat)
                                         }
                                     }
                             }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    // Active Dietary / Skill Preference Indicator
+                    if hasActivePreferences {
+                        Button(action: {
+                            selectedTab = 2
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.ulamOrange)
+                                if recipeController.dietaryPreference != "No restrictions" {
+                                    Text("Diet: \(recipeController.dietaryPreference)")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.ulamOrange)
+                                }
+                                if recipeController.skillLevel != "No preference" {
+                                    Text("Skill: \(recipeController.skillLevel)")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(Color.ulamTextDark)
+                                }
+                                Spacer()
+                                Text("Baguhin")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.ulamOrange)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .background(Color.ulamLightOrange)
+                            .cornerRadius(12)
                         }
                         .padding(.horizontal, 20)
                     }
@@ -126,9 +172,9 @@ struct HomeView: View {
                             }
                         }
                         
-                        NavigationLink(destination: RecipeDetailView(recipe: recipeVM.featuredMeal)) {
+                        NavigationLink(destination: RecipeDetailView(recipe: recipeController.featuredMeal)) {
                             ZStack(alignment: .bottomLeading) {
-                                AsyncImage(url: URL(string: recipeVM.featuredMeal.imageUrl)) { img in
+                                AsyncImage(url: URL(string: recipeController.featuredMeal.imageUrl)) { img in
                                     img.resizable().aspectRatio(contentMode: .fill)
                                 } placeholder: {
                                     Color.gray.opacity(0.2)
@@ -145,7 +191,7 @@ struct HomeView: View {
                                 .cornerRadius(20)
                                 
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(recipeVM.featuredMeal.category)
+                                    Text(recipeController.featuredMeal.category)
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 10)
@@ -153,15 +199,15 @@ struct HomeView: View {
                                         .background(Color.white.opacity(0.25))
                                         .cornerRadius(8)
                                     
-                                    Text(recipeVM.featuredMeal.title)
+                                    Text(recipeController.featuredMeal.title)
                                         .font(.system(size: 20, weight: .bold))
                                         .foregroundColor(.white)
                                         .lineLimit(1)
                                     
                                     HStack(spacing: 14) {
-                                        Label(recipeVM.featuredMeal.time, systemImage: "clock")
-                                        Label(recipeVM.featuredMeal.calories, systemImage: "flame")
-                                        Label(recipeVM.featuredMeal.rating, systemImage: "star.fill")
+                                        Label(recipeController.featuredMeal.time, systemImage: "clock")
+                                        Label(recipeController.featuredMeal.calories, systemImage: "flame")
+                                        Label(recipeController.featuredMeal.rating, systemImage: "star.fill")
                                             .foregroundColor(.yellow)
                                     }
                                     .font(.system(size: 12, weight: .medium))
@@ -172,7 +218,7 @@ struct HomeView: View {
                                 VStack {
                                     HStack {
                                         Spacer()
-                                        Text(recipeVM.featuredMeal.difficulty.uppercased())
+                                        Text(recipeController.featuredMeal.difficulty.uppercased())
                                             .font(.system(size: 10, weight: .heavy))
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 5)
@@ -202,7 +248,7 @@ struct HomeView: View {
                             }
                         }
                         
-                        if recipeVM.isLoading {
+                        if recipeController.isLoading {
                             HStack {
                                 Spacer()
                                 ProgressView("Kumukuha ng mga lutuin...")
@@ -210,7 +256,7 @@ struct HomeView: View {
                                     .padding(.vertical, 30)
                                 Spacer()
                             }
-                        } else if let error = recipeVM.errorMessage, recipeVM.popularMeals.isEmpty {
+                        } else if let error = recipeController.errorMessage, recipeController.popularMeals.isEmpty {
                             VStack(spacing: 12) {
                                 Image(systemName: "wifi.exclamationmark")
                                     .font(.system(size: 30))
@@ -221,8 +267,8 @@ struct HomeView: View {
                                     .multilineTextAlignment(.center)
                                 Button("Subukan Muli") {
                                     Task {
-                                        await recipeVM.fetchFeaturedLive()
-                                        await recipeVM.fetchMeals(for: recipeVM.selectedCategory)
+                                        await recipeController.fetchFeaturedLive()
+                                        await recipeController.fetchMeals(for: recipeController.selectedCategory)
                                     }
                                 }
                                 .font(.system(size: 13, weight: .bold))
@@ -241,7 +287,7 @@ struct HomeView: View {
                                 RoundedRectangle(cornerRadius: 16)
                                     .stroke(Color.ulamBorder, lineWidth: 1)
                             )
-                        } else if recipeVM.popularMeals.isEmpty {
+                        } else if recipeController.popularMeals.isEmpty {
                             VStack(spacing: 12) {
                                 Image(systemName: "magnifyingglass")
                                     .font(.system(size: 28))
@@ -256,7 +302,7 @@ struct HomeView: View {
                                 Button("I-reset") {
                                     search = ""
                                     Task {
-                                        await recipeVM.fetchMeals(for: "All")
+                                        await recipeController.fetchMeals(for: "All")
                                     }
                                 }
                                 .font(.system(size: 13, weight: .bold))
@@ -277,7 +323,7 @@ struct HomeView: View {
                             )
                         } else {
                             LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 14) {
-                                ForEach(recipeVM.popularMeals) { meal in
+                                ForEach(recipeController.popularMeals) { meal in
                                     NavigationLink(destination: RecipeDetailView(recipe: meal)) {
                                         PopularDishCard(meal: meal)
                                     }
@@ -293,64 +339,5 @@ struct HomeView: View {
             .background(Color.ulamCream.ignoresSafeArea())
             .navigationBarHidden(true)
         }
-    }
-}
-
-struct PopularDishCard: View {
-    @EnvironmentObject var recipeVM: RecipeViewModel
-    let meal: RecipeItem
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topTrailing) {
-                AsyncImage(url: URL(string: meal.imageUrl)) { img in
-                    img.resizable().aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Color.gray.opacity(0.2)
-                }
-                .frame(height: 120)
-                .clipped()
-                .cornerRadius(14)
-                
-                Button(action: {
-                    recipeVM.toggleSave(meal: meal)
-                }) {
-                    Image(systemName: recipeVM.isSaved(meal: meal) ? "heart.fill" : "heart")
-                        .font(.system(size: 12, weight: .bold))
-                        .padding(7)
-                        .background(Color.black.opacity(0.45))
-                        .foregroundColor(recipeVM.isSaved(meal: meal) ? Color.ulamOrange : .white)
-                        .clipShape(Circle())
-                }
-                .padding(8)
-            }
-            
-            Text(meal.title)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(Color.ulamTextDark)
-                .lineLimit(1)
-            
-            HStack {
-                Text(meal.time)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-                Spacer()
-                HStack(spacing: 2) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(.ulamOrange)
-                    Text(meal.rating)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color.ulamTextDark)
-                }
-            }
-        }
-        .padding(10)
-        .background(Color.ulamCard)
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.ulamBorder, lineWidth: 1)
-        )
     }
 }

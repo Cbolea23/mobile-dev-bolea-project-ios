@@ -9,8 +9,8 @@ import SwiftUI
 
 @main
 struct midterm_projectApp: App {
-    @StateObject private var authVM = AuthViewModel()
-    @StateObject private var recipeVM = RecipeViewModel()
+    @StateObject private var authController = AuthController()
+    @StateObject private var recipeController = RecipeController()
     
     init() {
         DatabaseService.shared.configureIfNeeded()
@@ -19,8 +19,8 @@ struct midterm_projectApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(authVM)
-                .environmentObject(recipeVM)
+                .environmentObject(authController)
+                .environmentObject(recipeController)
         }
     }
 }

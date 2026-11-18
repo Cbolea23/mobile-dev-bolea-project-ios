@@ -7,19 +7,23 @@
 
 import SwiftUI
 import Combine
+import UserNotifications
 
 struct CookingModeView: View {
     @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var recipeVM: RecipeViewModel
+    @EnvironmentObject var recipeController: RecipeController
     
     let recipe: RecipeItem
+    var notificationsEnabled: Bool = true
     var onFinishCooking: () -> Void
     
     @State private var currentStepIndex: Int = 0
     @State private var showIngredients: Bool = false
     @State private var remainingSeconds: Int = 0
     @State private var isTimerRunning: Bool = false
+    @State private var showTimerFinishedAlert: Bool = false
     
+    private let timerNotificationId = "anongulam.cooking.timer"
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     private var steps: [String] {
@@ -117,6 +121,11 @@ struct CookingModeView: View {
                                         remainingSeconds = 5 * 60
                                     }
                                     isTimerRunning.toggle()
+                                    if isTimerRunning {
+                                        scheduleTimerNotification(after: remainingSeconds)
+                                    } else {
+                                        cancelTimerNotification()
+                                    }
                                 }) {
                                     Label(
                                         isTimerRunning ? "I-pause" : "Simulan",
@@ -133,6 +142,7 @@ struct CookingModeView: View {
                                 Button(action: {
                                     isTimerRunning = false
                                     remainingSeconds = 0
+                                    cancelTimerNotification()
                                 }) {
                                     Text("I-reset")
                                         .font(.system(size: 13, weight: .bold))
@@ -174,7 +184,7 @@ struct CookingModeView: View {
                                 if showIngredients {
                                     VStack(spacing: 8) {
                                         ForEach(recipe.ingredients, id: \.self) { item in
-                                            let isChecked = recipeVM.checkedIngredients.contains(item)
+                                            let isChecked = recipeController.isIngredientChecked(item, mealId: recipe.id)
                                             HStack(spacing: 10) {
                                                 Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
                                                     .foregroundColor(isChecked ? .ulamOrange : .secondary)
@@ -186,7 +196,7 @@ struct CookingModeView: View {
                                             }
                                             .contentShape(Rectangle())
                                             .onTapGesture {
-                                                recipeVM.toggleIngredient(item)
+                                                recipeController.toggleIngredient(item, mealId: recipe.id)
                                             }
                                         }
                                     }
@@ -228,6 +238,8 @@ struct CookingModeView: View {
                     
                     Button(action: {
                         if isLastStep {
+                            isTimerRunning = false
+                            cancelTimerNotification()
                             onFinishCooking()
                             dismiss()
                         } else {
@@ -254,6 +266,7 @@ struct CookingModeView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Isara") {
                         isTimerRunning = false
+                        cancelTimerNotification()
                         dismiss()
                     }
                     .foregroundColor(.ulamOrange)
@@ -261,11 +274,19 @@ struct CookingModeView: View {
             }
             .onReceive(timer) { _ in
                 guard isTimerRunning else { return }
-                if remainingSeconds > 0 {
+                if remainingSeconds > 1 {
                     remainingSeconds -= 1
                 } else {
+                    remainingSeconds = 0
                     isTimerRunning = false
+                    cancelTimerNotification()
+                    showTimerFinishedAlert = true
                 }
+            }
+            .alert("Tapos na ang Timer! ⏰", isPresented: $showTimerFinishedAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Tapos na ang oras ng pagluluto para sa \(recipe.title).")
             }
         }
     }
@@ -273,28 +294,36 @@ struct CookingModeView: View {
     private func setTimer(seconds: Int) {
         remainingSeconds = seconds
         isTimerRunning = true
+        scheduleTimerNotification(after: seconds)
+    }
+    
+    private func scheduleTimerNotification(after seconds: Int) {
+        guard notificationsEnabled, seconds > 0 else { return }
+        let center = UNUserNotificationCenter.current()
+        let recipeTitle = recipe.title
+        let notificationId = timerNotificationId
+        
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Anong Ulam? — Cooking Timer"
+            content.body = "Tapos na ang timer para sa \(recipeTitle)!"
+            content.sound = .default
+            
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(seconds), repeats: false)
+            let request = UNNotificationRequest(identifier: notificationId, content: content, trigger: trigger)
+            center.removePendingNotificationRequests(withIdentifiers: [notificationId])
+            center.add(request)
+        }
+    }
+    
+    private func cancelTimerNotification() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [timerNotificationId])
     }
     
     private func formattedTime(_ totalSeconds: Int) -> String {
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60
         return String(format: "%02d:%02d", minutes, seconds)
-    }
-}
-
-struct TimerPresetButton: View {
-    let title: String
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.ulamOrange)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background(Color.ulamLightOrange)
-                .cornerRadius(8)
-        }
     }
 }

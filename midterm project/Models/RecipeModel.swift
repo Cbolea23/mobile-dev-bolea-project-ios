@@ -47,38 +47,3 @@ struct RecipeItem: Identifiable, Codable, Equatable {
     let ingredients: [String]
     let instructions: [String]
 }
-
-struct UserProfile: Codable, Equatable {
-    var username: String
-    var email: String
-    var recipesCount: Int
-    var savedCount: Int
-    var cookedCount: Int
-    var dietaryPreference: String
-    var skillLevel: String
-    var notificationsEnabled: Bool
-    
-    static func defaultProfile(username: String, email: String) -> UserProfile {
-        UserProfile(
-            username: username,
-            email: email,
-            recipesCount: 12,
-            savedCount: 0,
-            cookedCount: 0,
-            dietaryPreference: "No restrictions",
-            skillLevel: "No preference",
-            notificationsEnabled: true
-        )
-    }
-}
-
-/// Represents a persisted user account for local storage and Firebase sync.
-struct UserAccount: Codable, Identifiable, Equatable {
-    var id: String
-    var username: String
-    var email: String
-    var password: String
-    var profile: UserProfile
-    var savedMeals: [RecipeItem]
-    var cookedMealIds: [String]
-}

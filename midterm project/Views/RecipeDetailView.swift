@@ -9,8 +9,8 @@ import SwiftUI
 
 struct RecipeDetailView: View {
     @Environment(\.dismiss) var dismiss
-    @EnvironmentObject var authVM: AuthViewModel
-    @EnvironmentObject var recipeVM: RecipeViewModel
+    @EnvironmentObject var authController: AuthController
+    @EnvironmentObject var recipeController: RecipeController
     
     @State var recipe: RecipeItem
     @State private var selectedTab: Int = 0
@@ -43,8 +43,8 @@ struct RecipeDetailView: View {
                                     .clipShape(Circle())
                             }
                             Spacer()
-                            Button(action: { recipeVM.toggleSave(meal: recipe) }) {
-                                Image(systemName: recipeVM.isSaved(meal: recipe) ? "bookmark.fill" : "bookmark")
+                            Button(action: { recipeController.toggleSave(meal: recipe) }) {
+                                Image(systemName: recipeController.isSaved(meal: recipe) ? "bookmark.fill" : "bookmark")
                                     .font(.system(size: 14, weight: .bold))
                                     .padding(11)
                                     .background(Color.black.opacity(0.5))
@@ -162,7 +162,7 @@ struct RecipeDetailView: View {
                         // Ingredients Checklist
                         VStack(spacing: 8) {
                             ForEach(recipe.ingredients, id: \.self) { item in
-                                let isChecked = recipeVM.checkedIngredients.contains(item)
+                                let isChecked = recipeController.isIngredientChecked(item, mealId: recipe.id)
                                 HStack(spacing: 12) {
                                     Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
                                         .font(.system(size: 18))
@@ -184,7 +184,7 @@ struct RecipeDetailView: View {
                                         .stroke(Color.ulamBorder, lineWidth: 1)
                                 )
                                 .onTapGesture {
-                                    recipeVM.toggleIngredient(item)
+                                    recipeController.toggleIngredient(item, mealId: recipe.id)
                                 }
                             }
                         }
@@ -225,8 +225,9 @@ struct RecipeDetailView: View {
                 // Fetch full ingredients & instructions if not yet loaded
                 if recipe.ingredients.isEmpty || recipe.instructions.isEmpty {
                     self.isLoadingDetails = true
-                    if let full = await recipeVM.fetchRecipeDetails(id: recipe.id) {
+                    if let full = await recipeController.fetchRecipeDetails(id: recipe.id) {
                         self.recipe = full
+                        recipeController.updateCachedMealDetails(full)
                     }
                     self.isLoadingDetails = false
                 }
@@ -236,7 +237,7 @@ struct RecipeDetailView: View {
             Button(action: {
                 showCookingMode = true
             }) {
-                Text(recipeVM.isCooked(meal: recipe)
+                Text(recipeController.isCooked(meal: recipe)
                      ? "Lutuing Muli (Naluto Na ✓)"
                      : "Magsimula ng Pagluluto")
                     .font(.system(size: 16, weight: .bold))
@@ -264,35 +265,14 @@ struct RecipeDetailView: View {
         .navigationBarHidden(true)
         .ignoresSafeArea(edges: .top)
         .sheet(isPresented: $showCookingMode) {
-            CookingModeView(recipe: recipe) {
-                let total = recipeVM.markAsCooked(meal: recipe)
-                authVM.recordCookedCount(total)
+            CookingModeView(
+                recipe: recipe,
+                notificationsEnabled: authController.userProfile.notificationsEnabled
+            ) {
+                let total = recipeController.markAsCooked(meal: recipe)
+                authController.recordCookedCount(total)
             }
-            .environmentObject(recipeVM)
+            .environmentObject(recipeController)
         }
-    }
-}
-
-struct StatCard: View {
-    let value: String
-    let label: String
-    
-    var body: some View {
-        VStack(spacing: 3) {
-            Text(value)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.ulamOrange)
-            Text(label)
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Color.ulamCard)
-        .cornerRadius(14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.ulamBorder, lineWidth: 1)
-        )
     }
 }

@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var authVM: AuthViewModel
-    @EnvironmentObject var recipeVM: RecipeViewModel
+    @EnvironmentObject var authController: AuthController
+    @EnvironmentObject var recipeController: RecipeController
     @State private var selectedTab = 0
     
     init() {
@@ -23,11 +23,11 @@ struct ContentView: View {
     
     var body: some View {
         Group {
-            if !authVM.isAuthenticated {
+            if !authController.isAuthenticated {
                 LoginView()
             } else {
                 TabView(selection: $selectedTab) {
-                    HomeView()
+                    HomeView(selectedTab: $selectedTab)
                         .tabItem {
                             Image(systemName: selectedTab == 0 ? "house.fill" : "house")
                             Text("Home")
@@ -52,14 +52,14 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            recipeVM.syncForUser(email: authVM.currentUserEmail)
+            recipeController.syncForUser(email: authController.currentUserEmail)
         }
-        .onChange(of: authVM.currentUserEmail) { _, newEmail in
-            recipeVM.syncForUser(email: newEmail)
+        .onChange(of: authController.currentUserEmail) { _, newEmail in
+            recipeController.syncForUser(email: newEmail)
         }
-        .onChange(of: authVM.isAuthenticated) { _, isAuth in
+        .onChange(of: authController.isAuthenticated) { _, isAuth in
             if isAuth {
-                recipeVM.syncForUser(email: authVM.currentUserEmail)
+                recipeController.syncForUser(email: authController.currentUserEmail)
             } else {
                 selectedTab = 0
             }

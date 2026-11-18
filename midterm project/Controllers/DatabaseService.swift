@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import CryptoKit
 
 #if canImport(FirebaseCore) && canImport(FirebaseAuth) && canImport(FirebaseFirestore)
 import FirebaseCore
@@ -48,6 +49,7 @@ final class DatabaseService: ObservableObject {
     
     static let defaultEmail = "christianbolea@gmail.com"
     static let guestEmail = "guest@anongulam.ph"
+    static let demoPlaceholderPassword = "••••••••"
     
     var backendLabel: String {
         isFirebaseActive ? "Firebase Auth + Firestore" : "Local DB (Firebase Ready)"
@@ -55,6 +57,10 @@ final class DatabaseService: ObservableObject {
     
     private init() {
         ensureDefaultAccountSeeded()
+    }
+    
+    nonisolated static func hashPassword(_ password: String, email: String) -> String {
+        UserAccount.hashPassword(password, email: email)
     }
     
     /// Configures Firebase if GoogleService-Info.plist and Firebase SDKs are present.
@@ -77,9 +83,21 @@ final class DatabaseService: ObservableObject {
     
     func signIn(email: String, password: String) async throws -> UserAccount {
         let normalizedEmail = Self.normalizeEmail(email)
+        let passwordHash = Self.hashPassword(password, email: normalizedEmail)
+        let seededDemoHash = Self.hashPassword(Self.demoPlaceholderPassword, email: Self.defaultEmail)
+        let isDemoCredential = normalizedEmail == Self.defaultEmail
+            && (password == Self.demoPlaceholderPassword || password == "password123")
         
         #if canImport(FirebaseCore) && canImport(FirebaseAuth) && canImport(FirebaseFirestore)
         if isFirebaseActive {
+            if normalizedEmail == Self.defaultEmail && password == Self.demoPlaceholderPassword {
+                ensureDefaultAccountSeeded()
+                if let demoAccount = loadExistingAccount(email: Self.defaultEmail),
+                   demoAccount.passwordHash == seededDemoHash {
+                    return demoAccount
+                }
+            }
+            
             do {
                 let authResult = try await Auth.auth().signIn(withEmail: normalizedEmail, password: password)
                 let uid = authResult.user.uid
@@ -87,7 +105,7 @@ final class DatabaseService: ObservableObject {
                 
                 if var remoteAccount = await fetchFirestoreAccount(uid: uid) {
                     remoteAccount.email = normalizedEmail
-                    remoteAccount.password = password
+                    remoteAccount.passwordHash = passwordHash
                     saveAccountLocally(remoteAccount)
                     return remoteAccount
                 } else {
@@ -95,15 +113,22 @@ final class DatabaseService: ObservableObject {
                         id: uid,
                         username: fallbackName,
                         email: normalizedEmail,
-                        password: password
+                        passwordHash: passwordHash
                     )
                     local.id = uid
-                    local.password = password
+                    local.passwordHash = passwordHash
                     saveAccountLocally(local)
                     await saveFirestoreAccount(local)
                     return local
                 }
             } catch {
+                if isDemoCredential {
+                    ensureDefaultAccountSeeded()
+                    if let demoAccount = loadExistingAccount(email: Self.defaultEmail),
+                       demoAccount.passwordHash == seededDemoHash {
+                        return demoAccount
+                    }
+                }
                 throw DatabaseError.custom(error.localizedDescription)
             }
         }
@@ -113,10 +138,8 @@ final class DatabaseService: ObservableObject {
             throw DatabaseError.accountNotFound
         }
         
-        let matchesStored = account.password == password
-        let matchesDefaultAlias = normalizedEmail == Self.defaultEmail
-            && account.password == "••••••••"
-            && password == "password123"
+        let matchesStored = account.passwordHash == passwordHash
+        let matchesDefaultAlias = isDemoCredential && account.passwordHash == seededDemoHash
         
         guard matchesStored || matchesDefaultAlias else {
             throw DatabaseError.invalidCredentials
@@ -128,6 +151,7 @@ final class DatabaseService: ObservableObject {
     func register(username: String, email: String, password: String) async throws -> UserAccount {
         let normalizedEmail = Self.normalizeEmail(email)
         let cleanUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        let passwordHash = Self.hashPassword(password, email: normalizedEmail)
         
         #if canImport(FirebaseCore) && canImport(FirebaseAuth) && canImport(FirebaseFirestore)
         if isFirebaseActive {
@@ -141,7 +165,7 @@ final class DatabaseService: ObservableObject {
                     id: authResult.user.uid,
                     username: cleanUsername,
                     email: normalizedEmail,
-                    password: password
+                    passwordHash: passwordHash
                 )
                 saveAccountLocally(newAccount)
                 await saveFirestoreAccount(newAccount)
@@ -160,7 +184,7 @@ final class DatabaseService: ObservableObject {
             id: normalizedEmail,
             username: cleanUsername,
             email: normalizedEmail,
-            password: password
+            passwordHash: passwordHash
         )
         saveAccountLocally(newAccount)
         return newAccount
@@ -184,7 +208,7 @@ final class DatabaseService: ObservableObject {
             throw DatabaseError.accountNotFound
         }
         if let newPassword, !newPassword.isEmpty {
-            account.password = newPassword
+            account.passwordHash = Self.hashPassword(newPassword, email: normalizedEmail)
             saveAccountLocally(account)
         }
     }
@@ -209,7 +233,7 @@ final class DatabaseService: ObservableObject {
                 id: Self.guestEmail,
                 username: "Bisita",
                 email: Self.guestEmail,
-                password: ""
+                passwordHash: ""
             )
             saveAccountLocally(guest)
             return guest
@@ -219,7 +243,7 @@ final class DatabaseService: ObservableObject {
             id: normalizedEmail,
             username: Self.fallbackUsername(from: normalizedEmail),
             email: normalizedEmail,
-            password: ""
+            passwordHash: ""
         )
     }
     
@@ -291,7 +315,7 @@ final class DatabaseService: ObservableObject {
             id: Self.defaultEmail,
             username: "Christian",
             email: Self.defaultEmail,
-            password: "••••••••"
+            passwordHash: Self.hashPassword(Self.demoPlaceholderPassword, email: Self.defaultEmail)
         )
         defaultAccount.savedMeals = legacyMeals
         defaultAccount.profile.savedCount = legacyMeals.count
@@ -299,20 +323,21 @@ final class DatabaseService: ObservableObject {
         saveAllAccounts(accounts)
     }
     
-    private func makeNewAccount(id: String, username: String, email: String, password: String) -> UserAccount {
+    private func makeNewAccount(id: String, username: String, email: String, passwordHash: String) -> UserAccount {
         let normalized = Self.normalizeEmail(email)
         return UserAccount(
             id: id,
             username: username,
             email: normalized,
-            password: password,
+            passwordHash: passwordHash,
             profile: UserProfile.defaultProfile(username: username, email: normalized),
             savedMeals: [],
-            cookedMealIds: []
+            cookedMealIds: [],
+            checkedIngredientsByMeal: [:]
         )
     }
     
-    static func normalizeEmail(_ email: String) -> String {
+    nonisolated static func normalizeEmail(_ email: String) -> String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
     
@@ -325,9 +350,9 @@ final class DatabaseService: ObservableObject {
     
     #if canImport(FirebaseCore) && canImport(FirebaseAuth) && canImport(FirebaseFirestore)
     private func saveFirestoreAccount(_ account: UserAccount) async {
-        // Avoid storing plaintext passwords in Firestore
+        // Avoid storing password hashes in Firestore
         var sanitized = account
-        sanitized.password = ""
+        sanitized.passwordHash = ""
         guard let data = try? JSONEncoder().encode(sanitized),
               let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             return
