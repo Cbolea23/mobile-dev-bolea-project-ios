@@ -69,12 +69,14 @@ class RecipeController: ObservableObject {
     
     var availableCategories: [String] {
         switch dietaryPreference {
-        case "Halal":
+        case "Halal", "Low-Carb":
             return ["All", "Beef", "Chicken", "Seafood"]
         case "Vegetarian":
             return ["All", "Vegetarian"]
         case "Pescatarian":
             return ["All", "Seafood"]
+        case "Dairy-Free":
+            return ["All", "Beef", "Chicken", "Pork", "Seafood", "Vegetarian"]
         default:
             return ["All", "Beef", "Chicken", "Pork", "Seafood"]
         }
@@ -112,8 +114,19 @@ class RecipeController: ObservableObject {
             selectedCategory = "All"
         }
         
-        if refreshMeals && (previousDietary != dietaryPreference || previousSkill != skillLevel) {
+        let requiresRefresh = refreshMeals && (
+            previousDietary != dietaryPreference ||
+            previousSkill != skillLevel ||
+            !isMealMatchingPreferences(featuredMeal)
+        )
+        if requiresRefresh {
+            let needsFeaturedRefresh = previousDietary != dietaryPreference ||
+                previousSkill != skillLevel ||
+                !isMealMatchingPreferences(featuredMeal)
             Task {
+                if needsFeaturedRefresh {
+                    await fetchFeaturedLive()
+                }
                 await fetchMeals(for: selectedCategory)
             }
         }
@@ -129,8 +142,12 @@ class RecipeController: ObservableObject {
             selectedCategory = "All"
         }
         
-        if dietaryChanged || skillChanged {
+        if dietaryChanged || skillChanged || !isMealMatchingPreferences(featuredMeal) {
+            let needsFeaturedRefresh = dietaryChanged || skillChanged || !isMealMatchingPreferences(featuredMeal)
             Task {
+                if needsFeaturedRefresh {
+                    await fetchFeaturedLive()
+                }
                 await fetchMeals(for: selectedCategory)
             }
         }
@@ -150,13 +167,18 @@ class RecipeController: ObservableObject {
     
     // MARK: - Live API Calls
     
-    /// Fetches a random dish from API
+    /// Fetches a random dish from API that matches active dietary and skill preferences
     func fetchFeaturedLive() async {
+        if dietaryPreference != "No restrictions" || skillLevel != "No preference" {
+            await fetchDietaryFallbackFeatured()
+            return
+        }
+        
         guard let url = makeMealDBURL(path: "random.php") else { return }
         do {
             let data = try await fetchValidatedData(from: url)
             if let decoded = parseMealLookup(data: data).first {
-                if isMealAllowed(decoded) {
+                if isMealMatchingPreferences(decoded) {
                     self.featuredMeal = decoded
                 } else {
                     await fetchDietaryFallbackFeatured()
@@ -174,10 +196,10 @@ class RecipeController: ObservableObject {
             fallbackCategory = "Vegetarian"
         case "Pescatarian":
             fallbackCategory = "Seafood"
-        case "Halal":
+        case "Halal", "Low-Carb", "Dairy-Free":
             fallbackCategory = "Chicken"
         default:
-            return
+            fallbackCategory = selectedCategory == "All" ? "Chicken" : selectedCategory
         }
         guard let filterURL = makeMealDBURL(
             path: "filter.php",
@@ -186,10 +208,42 @@ class RecipeController: ObservableObject {
         do {
             let data = try await fetchValidatedData(from: filterURL)
             let result = try JSONDecoder().decode(MealResponse.self, from: data)
-            if let firstMeal = result.meals?.first,
-               let full = await fetchRecipeDetails(id: firstMeal.idMeal),
-               isMealAllowed(full) {
-                self.featuredMeal = full
+            guard let allCandidates = result.meals, !allCandidates.isEmpty else { return }
+            
+            let candidateItems: [RecipeItem] = allCandidates.map { meal in
+                let meta = deterministicMetadata(for: meal.idMeal, stepCount: nil)
+                return RecipeItem(
+                    id: meal.idMeal,
+                    title: meal.strMeal,
+                    nativeName: "\(fallbackCategory) Special",
+                    origin: "International",
+                    time: meta.time,
+                    servings: "4 servings",
+                    calories: meta.calories,
+                    rating: meta.rating,
+                    category: fallbackCategory,
+                    difficulty: meta.difficulty,
+                    imageUrl: meal.strMealThumb,
+                    ingredients: [],
+                    instructions: []
+                )
+            }
+            
+            let matchingPool = applyDietaryAndSkillPreferences(to: candidateItems).shuffled()
+            for candidate in matchingPool.prefix(4) {
+                if let full = await fetchRecipeDetails(id: candidate.id),
+                   isMealMatchingPreferences(full) {
+                    self.featuredMeal = full
+                    return
+                }
+            }
+            
+            if let firstMatch = matchingPool.first {
+                if let full = await fetchRecipeDetails(id: firstMatch.id) {
+                    self.featuredMeal = full
+                } else {
+                    self.featuredMeal = firstMatch
+                }
             }
         } catch {
             // Keep existing featured meal if fallback lookup fails
@@ -204,60 +258,64 @@ class RecipeController: ObservableObject {
         self.errorMessage = nil
         defer { self.isLoading = false }
         
-        let endpointURL: URL?
-        let isLookupEndpoint: Bool
-        
+        let apiCategory: String
         if targetCategory == "All" {
             switch dietaryPreference {
             case "Vegetarian":
-                endpointURL = makeMealDBURL(path: "filter.php", queryItems: [URLQueryItem(name: "c", value: "Vegetarian")])
-                isLookupEndpoint = false
+                apiCategory = "Vegetarian"
             case "Pescatarian":
-                endpointURL = makeMealDBURL(path: "filter.php", queryItems: [URLQueryItem(name: "c", value: "Seafood")])
-                isLookupEndpoint = false
+                apiCategory = "Seafood"
             default:
-                endpointURL = makeMealDBURL(path: "search.php", queryItems: [URLQueryItem(name: "s", value: "chicken")])
-                isLookupEndpoint = true
+                apiCategory = "Chicken"
             }
         } else {
-            endpointURL = makeMealDBURL(path: "filter.php", queryItems: [URLQueryItem(name: "c", value: targetCategory)])
-            isLookupEndpoint = false
+            apiCategory = targetCategory
         }
         
-        guard let url = endpointURL else { return }
+        guard let url = makeMealDBURL(
+            path: "filter.php",
+            queryItems: [URLQueryItem(name: "c", value: apiCategory)]
+        ) else { return }
         
         do {
             let data = try await fetchValidatedData(from: url)
+            let result = try JSONDecoder().decode(MealResponse.self, from: data)
             let mealsList: [RecipeItem]
-            if isLookupEndpoint {
-                mealsList = Array(parseMealLookup(data: data).prefix(10))
-            } else {
-                let result = try JSONDecoder().decode(MealResponse.self, from: data)
-                if let fetched = result.meals {
-                    mealsList = fetched.prefix(10).map { meal in
-                        let meta = deterministicMetadata(for: meal.idMeal, stepCount: nil)
-                        return RecipeItem(
-                            id: meal.idMeal,
-                            title: meal.strMeal,
-                            nativeName: targetCategory == "All" ? "Chef's Pick" : "\(targetCategory) Special",
-                            origin: "International",
-                            time: meta.time,
-                            servings: "4 servings",
-                            calories: meta.calories,
-                            rating: meta.rating,
-                            category: targetCategory == "All" ? "Chef's Pick" : targetCategory,
-                            difficulty: meta.difficulty,
-                            imageUrl: meal.strMealThumb,
-                            ingredients: [],
-                            instructions: []
-                        )
-                    }
-                } else {
-                    mealsList = []
+            if let fetched = result.meals {
+                mealsList = fetched.map { meal in
+                    let meta = deterministicMetadata(for: meal.idMeal, stepCount: nil)
+                    return RecipeItem(
+                        id: meal.idMeal,
+                        title: meal.strMeal,
+                        nativeName: targetCategory == "All" ? "\(apiCategory) Classic" : "\(targetCategory) Special",
+                        origin: "International",
+                        time: meta.time,
+                        servings: "4 servings",
+                        calories: meta.calories,
+                        rating: meta.rating,
+                        category: apiCategory,
+                        difficulty: meta.difficulty,
+                        imageUrl: meal.strMealThumb,
+                        ingredients: [],
+                        instructions: []
+                    )
                 }
+            } else {
+                mealsList = []
             }
             
-            self.popularMeals = applyDietaryAndSkillPreferences(to: mealsList)
+            let filtered = applyDietaryAndSkillPreferences(to: mealsList)
+            self.popularMeals = Array(filtered.prefix(12))
+            
+            if !isMealMatchingPreferences(self.featuredMeal),
+               let firstMatch = self.popularMeals.first {
+                self.featuredMeal = firstMatch
+                Task {
+                    if let full = await fetchRecipeDetails(id: firstMatch.id) {
+                        updateCachedMealDetails(full)
+                    }
+                }
+            }
         } catch {
             self.errorMessage = "Hindi ma-load ang mga recipe. Pakisuri ang iyong internet connection."
             print("API Error: \(error.localizedDescription)")
@@ -344,17 +402,25 @@ class RecipeController: ObservableObject {
     
     private func applyDietaryAndSkillPreferences(to meals: [RecipeItem]) -> [RecipeItem] {
         let filtered = meals.filter { isMealAllowed($0) }
-        guard let preferredDifficulty = preferredDifficultyForSkillLevel() else {
+        guard preferredDifficultyForSkillLevel() != nil else {
             return filtered
         }
-        return filtered.sorted { lhs, rhs in
-            let lhsMatches = lhs.difficulty.caseInsensitiveCompare(preferredDifficulty) == .orderedSame
-            let rhsMatches = rhs.difficulty.caseInsensitiveCompare(preferredDifficulty) == .orderedSame
-            if lhsMatches != rhsMatches {
-                return lhsMatches
-            }
-            return false
+        let skillMatches = filtered.filter { isSkillAllowed($0) }
+        if !skillMatches.isEmpty {
+            return skillMatches
         }
+        return filtered
+    }
+    
+    private func isMealMatchingPreferences(_ meal: RecipeItem) -> Bool {
+        isMealAllowed(meal) && isSkillAllowed(meal)
+    }
+    
+    private func isSkillAllowed(_ meal: RecipeItem) -> Bool {
+        guard let preferredDifficulty = preferredDifficultyForSkillLevel() else {
+            return true
+        }
+        return meal.difficulty.caseInsensitiveCompare(preferredDifficulty) == .orderedSame
     }
     
     private func isMealAllowed(_ meal: RecipeItem) -> Bool {
@@ -368,6 +434,12 @@ class RecipeController: ObservableObject {
             return !forbidden.contains(where: { combinedText.contains($0) })
         case "Pescatarian":
             let forbidden = ["pork", "beef", "chicken", "lamb", "turkey", "duck", "bacon", "ham"]
+            return !forbidden.contains(where: { combinedText.contains($0) })
+        case "Low-Carb":
+            let forbidden = ["pork", "pasta", "spaghetti", "macaroni", "noodle", "rice", "bread", "cake", "pie", "pudding", "pancake", "waffle", "tart", "potato", "fries", "couscous", "pizza", "bun", "dough"]
+            return !forbidden.contains(where: { combinedText.contains($0) })
+        case "Dairy-Free":
+            let forbidden = ["cheese", "milk", "cream", "butter", "yogurt", "yoghurt", "cheddar", "mozzarella", "parmesan", "brie", "mascarpone", "paneer"]
             return !forbidden.contains(where: { combinedText.contains($0) })
         default:
             return true
@@ -441,24 +513,14 @@ class RecipeController: ObservableObject {
     }
     
     private func deterministicMetadata(for id: String, stepCount: Int?) -> (time: String, calories: String, rating: String, difficulty: String) {
+        _ = stepCount
         let seed = stableSeed(for: id)
         let minutes = 20 + (seed % 36)
         let kcal = 310 + ((seed / 7) % 320)
         let ratingValue = 4.5 + Double((seed / 13) % 6) * 0.1
         
-        let difficulty: String
-        if let stepCount {
-            if stepCount > 6 {
-                difficulty = "Hard"
-            } else if stepCount > 3 {
-                difficulty = "Medium"
-            } else {
-                difficulty = "Easy"
-            }
-        } else {
-            let options = ["Easy", "Medium", "Hard"]
-            difficulty = options[(seed / 3) % options.count]
-        }
+        let options = ["Easy", "Medium", "Hard"]
+        let difficulty = options[(seed / 3) % options.count]
         
         return (
             time: "\(minutes) min",

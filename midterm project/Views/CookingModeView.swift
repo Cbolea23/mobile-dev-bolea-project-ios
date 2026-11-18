@@ -104,6 +104,9 @@ struct CookingModeView: View {
                             }
                             
                             HStack(spacing: 8) {
+                                TimerPresetButton(title: "10 sec") {
+                                    setTimer(seconds: 10)
+                                }
                                 TimerPresetButton(title: "5 min") {
                                     setTimer(seconds: 5 * 60)
                                 }

@@ -11,9 +11,17 @@ struct PopularDishCard: View {
     @EnvironmentObject var recipeController: RecipeController
     let meal: RecipeItem
     
+    private var badgeColor: Color {
+        switch meal.difficulty.lowercased() {
+        case "easy": return .green
+        case "hard": return .red
+        default: return .ulamOrange
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topTrailing) {
+            ZStack(alignment: .top) {
                 AsyncImage(url: URL(string: meal.imageUrl)) { img in
                     img.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
@@ -23,15 +31,27 @@ struct PopularDishCard: View {
                 .clipped()
                 .cornerRadius(14)
                 
-                Button(action: {
-                    recipeController.toggleSave(meal: meal)
-                }) {
-                    Image(systemName: recipeController.isSaved(meal: meal) ? "heart.fill" : "heart")
-                        .font(.system(size: 12, weight: .bold))
-                        .padding(7)
-                        .background(Color.black.opacity(0.45))
-                        .foregroundColor(recipeController.isSaved(meal: meal) ? Color.ulamOrange : .white)
-                        .clipShape(Circle())
+                HStack {
+                    Text(meal.difficulty.uppercased())
+                        .font(.system(size: 9, weight: .heavy))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(badgeColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(6)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        recipeController.toggleSave(meal: meal)
+                    }) {
+                        Image(systemName: recipeController.isSaved(meal: meal) ? "heart.fill" : "heart")
+                            .font(.system(size: 12, weight: .bold))
+                            .padding(7)
+                            .background(Color.black.opacity(0.45))
+                            .foregroundColor(recipeController.isSaved(meal: meal) ? Color.ulamOrange : .white)
+                            .clipShape(Circle())
+                    }
                 }
                 .padding(8)
             }

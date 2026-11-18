@@ -6,6 +6,18 @@
 //
 
 import SwiftUI
+import UserNotifications
+
+final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationDelegate()
+    
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
+    }
+}
 
 @main
 struct midterm_projectApp: App {
@@ -14,6 +26,7 @@ struct midterm_projectApp: App {
     
     init() {
         DatabaseService.shared.configureIfNeeded()
+        UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
     }
     
     var body: some Scene {

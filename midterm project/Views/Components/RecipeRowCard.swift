@@ -30,9 +30,19 @@ struct RecipeRowCard: View {
                     .foregroundColor(Color.ulamTextDark)
                     .lineLimit(1)
                 
-                Text(meal.nativeName)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    Text(meal.nativeName)
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                    
+                    Text("•")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    
+                    Text(meal.difficulty)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.ulamOrange)
+                }
                 
                 HStack(spacing: 12) {
                     Label(meal.time, systemImage: "clock")
